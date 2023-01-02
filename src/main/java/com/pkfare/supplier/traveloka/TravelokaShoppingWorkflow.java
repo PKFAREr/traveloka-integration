@@ -8,6 +8,7 @@ import com.google.common.collect.Maps;
 import com.pkfare.common.HttpSend;
 import com.pkfare.supplier.Context;
 import com.pkfare.supplier.ShoppingWorkflow;
+import com.pkfare.supplier.annotation.LocationLoad;
 import com.pkfare.supplier.bean.configure.SupplierInterfaceConfig;
 import com.pkfare.supplier.logics.*;
 import com.pkfare.supplier.standard.bean.*;
@@ -49,6 +50,9 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     StandardLocations standardLocations;
     @Autowired
     TravelokaAuthorization travelokaAuthorization;
+
+    @LocationLoad("traveloka-location-mapping")
+    Locations locations;
 
     @Override
     public void validateInput(CtSearchParam ctSearchParam, Context context) throws InvalidInputException {
@@ -308,15 +312,15 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         req.setJourneys(Lists.newArrayList());
 
         JourneyReq dep = new JourneyReq();
-        dep.setDepAirportOrAreaCode(ctSearchParam.getFromCity());
-        dep.setArrAirportOrAreaCode(ctSearchParam.getToCity());
+        dep.setDepAirportOrAreaCode(locations.convert(ctSearchParam.getFromCity()));
+        dep.setArrAirportOrAreaCode(locations.convert(ctSearchParam.getToCity()));
         dep.setDepDate(Dates.of(ctSearchParam.getFromDate(), "yyyyMMdd").to("MM-dd-yyyy"));
         dep.setSeatClass(TravelokaConstant.SeatClass.ECONOMY.name());
         req.getJourneys().add(dep);
 
         JourneyReq ret = new JourneyReq();
-        ret.setDepAirportOrAreaCode(ctSearchParam.getToCity());
-        ret.setArrAirportOrAreaCode(ctSearchParam.getFromCity());
+        ret.setDepAirportOrAreaCode(locations.convert(ctSearchParam.getToCity()));
+        ret.setArrAirportOrAreaCode(locations.convert(ctSearchParam.getFromCity()));
         ret.setDepDate(Dates.of(ctSearchParam.getRetDate(), "yyyyMMdd").to("MM-dd-yyyy"));
         ret.setSeatClass(TravelokaConstant.SeatClass.ECONOMY.name());
         req.getJourneys().add(ret);
@@ -336,12 +340,12 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         JourneyReq journeyReq = new JourneyReq();
 
         if (TripType.DEPARTURE == indicator) {
-            journeyReq.setDepAirportOrAreaCode(ctSearchParam.getFromCity());
-            journeyReq.setArrAirportOrAreaCode(ctSearchParam.getToCity());
+            journeyReq.setDepAirportOrAreaCode(locations.convert(ctSearchParam.getFromCity()));
+            journeyReq.setArrAirportOrAreaCode(locations.convert(ctSearchParam.getToCity()));
             journeyReq.setDepDate(Dates.of(ctSearchParam.getFromDate(), "yyyyMMdd").to("MM-dd-yyyy"));
         } else {
-            journeyReq.setDepAirportOrAreaCode(ctSearchParam.getToCity());
-            journeyReq.setArrAirportOrAreaCode(ctSearchParam.getFromCity());
+            journeyReq.setDepAirportOrAreaCode(locations.convert(ctSearchParam.getToCity()));
+            journeyReq.setArrAirportOrAreaCode(locations.convert(ctSearchParam.getFromCity()));
             journeyReq.setDepDate(Dates.of(ctSearchParam.getRetDate(), "yyyyMMdd").to("MM-dd-yyyy"));
         }
         journeyReq.setSeatClass(TravelokaConstant.SeatClass.ECONOMY.name());
