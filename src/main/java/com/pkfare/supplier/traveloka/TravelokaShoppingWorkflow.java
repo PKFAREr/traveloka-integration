@@ -8,10 +8,10 @@ import com.google.common.collect.Maps;
 import com.pkfare.common.HttpSend;
 import com.pkfare.supplier.Context;
 import com.pkfare.supplier.ShoppingWorkflow;
-import com.pkfare.supplier.annotation.LocationLoad;
 import com.pkfare.supplier.bean.configure.SupplierInterfaceConfig;
 import com.pkfare.supplier.logics.*;
 import com.pkfare.supplier.standard.bean.*;
+import com.pkfare.supplier.standard.bean.base.APICodes;
 import com.pkfare.supplier.standard.bean.req.CtSearchParam;
 import com.pkfare.supplier.standard.bean.res.CtSearchResult;
 import com.pkfare.supplier.standard.bean.res.CtShoppingResult;
@@ -25,6 +25,7 @@ import com.pkfare.supplier.validation.InvalidOutputException;
 import io.reactivex.Single;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.RetryException;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static com.pkfare.supplier.traveloka.entity.constant.TravelokaConstant.cabinClassMapping;
@@ -51,7 +51,8 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     @Autowired
     TravelokaAuthorization travelokaAuthorization;
 
-    @LocationLoad("traveloka-location-mapping")
+    @Autowired
+    @Qualifier("traveloka-location-mapping")
     Locations locations;
 
     @Override
@@ -113,7 +114,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         if (!completed) {
             throw new RetryException("");
         }
-        CtSearchResult ctSearchResult = new CtSearchResult();
+        CtSearchResult ctSearchResult = CtSearchResult.success();
         List<CtShoppingResult> shoppingResultList = Lists.newArrayList();
         List<CtSearchSegment> flightList = Lists.newArrayList();
         ctSearchResult.setFlightList(flightList);
@@ -162,6 +163,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSegmentNo(TripType.DEPARTURE);
                 ctFlightRef.setFlightSeq(segmentIndex++);
                 ctFlightRef.setSeatGrade(cabinClassMapping(segment.getString("seatClass")));
+                ctFlightRef.setSeatCount(9);
                 ctFlightRefs.add(ctFlightRef);
                 farebasisList.add(segment.getString("fareBasisCode"));
 
@@ -179,6 +181,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSegmentNo(TripType.RETURN);
                 ctFlightRef.setFlightSeq(segmentIndex++);
                 ctFlightRef.setSeatGrade(cabinClassMapping(segment.getString("seatClass")));
+                ctFlightRef.setSeatCount(9);
                 ctFlightRefs.add(ctFlightRef);
                 farebasisList.add(segment.getString("fareBasisCode"));
             }
@@ -191,21 +194,23 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         JSONObject response = JSON.parseObject(payload);
         Boolean success = response.getBoolean("success");
         if (!success) {
-            throw new RuntimeException();
+            return new CtSearchResult(APICodes.Basic.RES_ERR);
         }
         JSONObject data = response.getJSONObject("data");
         Boolean completed = data.getBoolean("completed");
         if (!completed) {
             throw new RetryException("");
         }
-        CtSearchResult ctSearchResult = new CtSearchResult();
+        CtSearchResult ctSearchResult = CtSearchResult.success();
         List<CtShoppingResult> shoppingResultList = Lists.newArrayList();
         List<CtSearchSegment> flightList = Lists.newArrayList();
         ctSearchResult.setFlightList(flightList);
         ctSearchResult.setShoppingResultList(shoppingResultList);
 
         JSONArray array = data.getJSONArray("oneWayFlightSearchResults");
-
+        if (Objects.isNull(array)){
+            array = data.getJSONArray("basicRoundTripFlightSearchResults");
+        }
         //结果集级别索引，单次shopping所有结果进行计数
         int index = 0;
 
@@ -214,7 +219,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             JSONObject journey = (JSONObject) solution.getJSONArray("journeys").get(0);
             JSONArray segments = journey.getJSONArray("segments");
             CtShoppingResult ctShoppingResult = new CtShoppingResult();
-
+            shoppingResultList.add(ctShoppingResult);
             ctShoppingResult.setData(solution.getString("flightId"));
 
             List<CtFlightRef> ctFlightRefs = Lists.newArrayList();
@@ -244,6 +249,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSegmentNo(type);
                 ctFlightRef.setFlightSeq(segmentIndex++);
                 ctFlightRef.setSeatGrade(cabinClassMapping(segment.getString("seatClass")));
+                ctFlightRef.setSeatCount(9);
                 ctFlightRefs.add(ctFlightRef);
 
                 farebasisList.add(segment.getString("fareBasisCode"));
@@ -259,10 +265,10 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         ctSearchSegment.setDepAirport(departureDetail.getString("airportCode"));
         ctSearchSegment.setDepTerminal(departureDetail.getString("departureTerminal"));
         String depTime = departureDetail.getString("departureDate") + departureDetail.getString("departureTime");
-        ctSearchSegment.setDepTime(Times.of(depTime, "DD-MM-YYYYHH:MM").to("YYYYMMDDHHMM"));
+        ctSearchSegment.setDepTime(Times.of(depTime, "MM-dd-yyyyHH:mm").to("yyyyMMddHHmm"));
         JSONObject arrivalDetail = segment.getJSONObject("arrivalDetail");
         String arrTime = arrivalDetail.getString("arrivalDate") + arrivalDetail.getString("arrivalTime");
-        ctSearchSegment.setArrTime(Times.of(arrTime, "DD-MM-YYYYHH:MM").to("YYYYMMDDHHMM"));
+        ctSearchSegment.setArrTime(Times.of(arrTime, "MM-dd-yyyyHH:mm").to("yyyyMMddHHmm"));
         ctSearchSegment.setArrAirport(arrivalDetail.getString("airportCode"));
         ctSearchSegment.setArrTerminal(arrivalDetail.getString("arrivalTerminal"));
         ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-", ""));
@@ -287,16 +293,20 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         CtPrice adtPrice = new CtPrice();
         adtPrice.setPassengerType(CtPassengeType.ADT.code);
         adtPrice.setPrice(adultFare.getJSONObject("baseFareWithCurrency").getBigDecimal("amount"));
-        adtPrice.setTaxFeeAmount((BigDecimal) adultFare.getJSONObject("vatWithCurrency").getOrDefault("amount", BigDecimal.ZERO));
+        adtPrice.setTaxFeeAmount(BigDecimal.ZERO);
+        JSONObject adtVatWithCurrency = adultFare.getJSONObject("vatWithCurrency");
+        if (Objects.nonNull(adtVatWithCurrency)) {
+            adtPrice.setTaxFeeAmount((BigDecimal) adtVatWithCurrency.getOrDefault("amount", BigDecimal.ZERO));
+        }
         adtPrice.setPublishPrice(adtPrice.getPrice());
         ctPrices.add(adtPrice);
 
         JSONObject childFare = partnerFare.getJSONObject("childFare");
-        if (!childFare.isEmpty()) {
+        if (Objects.nonNull(childFare)) {
             CtPrice chdPrice = new CtPrice();
             chdPrice.setPassengerType(CtPassengeType.CHD.code);
             chdPrice.setPrice(childFare.getJSONObject("baseFareWithCurrency").getBigDecimal("amount"));
-
+            chdPrice.setTaxFeeAmount(BigDecimal.ZERO);
             JSONObject vatWithCurrency = childFare.getJSONObject("vatWithCurrency");
             if (Objects.nonNull(vatWithCurrency)) {
                 chdPrice.setTaxFeeAmount((BigDecimal) vatWithCurrency.getOrDefault("amount", BigDecimal.ZERO));
@@ -304,6 +314,8 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             chdPrice.setPublishPrice(chdPrice.getPrice());
             ctPrices.add(chdPrice);
         }
+        ctTu.setRefundInfoList(Lists.newArrayList());
+        ctTu.setChangesInfoList(Lists.newArrayList());
         return ctTu;
     }
 
@@ -360,43 +372,71 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
     private CtSearchResult combine(CtSearchResult dep, CtSearchResult ret){
         Map<String, CtSearchSegment> segmentMap = Maps.newHashMap();
+        CtSearchResult combineResult = CtSearchResult.success();
+
+        combineResult.setShoppingResultList(Lists.newArrayList());
         //航段引用序重排逻辑
-        AtomicReference<Integer> i = new AtomicReference<>(0);
-        dep.getFlightList().forEach(seg-> {
+        Integer i = 0;
+        for (CtSearchSegment seg : dep.getFlightList()) {
             segmentMap.put("d"+ seg.getFlightRefNum(), seg);
-            seg.setFlightRefNum(i.getAndSet(i.get() + 1));
-        });
-        ret.getFlightList().forEach(seg-> {
-            segmentMap.put("r"+seg.getFlightRefNum(),seg);
-            seg.setFlightRefNum(i.getAndSet(i.get() + 1));
-        });
+            seg.setFlightRefNum(i++);
+        }
+        for (CtSearchSegment seg : ret.getFlightList()) {
+            segmentMap.put("r"+ seg.getFlightRefNum(), seg);
+            seg.setFlightRefNum(i++);
+        }
+
+        for (CtShoppingResult result : dep.getShoppingResultList()) {
+            for (CtFlightRef ref : result.getFlightRefList()) {
+                CtSearchSegment segment = segmentMap.get("d"+ref.getFlightRefNum());
+                ref.setFlightRefNum(segment.getFlightRefNum());
+            }
+        }
+
+        for (CtShoppingResult result : ret.getShoppingResultList()) {
+            for (CtFlightRef ref : result.getFlightRefList()) {
+                CtSearchSegment segment = segmentMap.get("r"+ref.getFlightRefNum());
+                ref.setFlightRefNum(segment.getFlightRefNum());
+            }
+        }
+
 
         for (CtShoppingResult depResult : dep.getShoppingResultList()) {
             for (CtShoppingResult retResult : ret.getShoppingResultList()) {
-                depResult.getFlightRefList().forEach(ref-> {
-                    CtSearchSegment segment = segmentMap.get("d"+ref.getFlightRefNum());
-                    ref.setFlightRefNum(segment.getFlightRefNum());
-                });
-                retResult.getFlightRefList().forEach(ref-> {
-                    CtSearchSegment segment = segmentMap.get("r"+ref.getFlightRefNum());
-                    ref.setFlightRefNum(segment.getFlightRefNum());
-                });
-                depResult.getFlightRefList().addAll(retResult.getFlightRefList());
-
                 CtTu depCtTu = depResult.getTuList().get(0);
                 CtTu retCtTu = retResult.getTuList().get(0);
-                depCtTu.setFareBasis(depCtTu.getFareBasis()+";"+ retCtTu.getFareBasis());
 
+                CtTu combineCtTu = new CtTu();
+                combineCtTu.setPriceList(Lists.newArrayList());
+                combineCtTu.setFareBasis(depCtTu.getFareBasis()+";"+ retCtTu.getFareBasis());
                 Map<Integer,CtPrice> priceMap = depCtTu.getPriceList().stream().collect(Collectors.toMap(CtPrice::getPassengerType, price -> price));
                 for (CtPrice retPrice : retCtTu.getPriceList()) {
+                    CtPrice combinePrice = new CtPrice();
                     CtPrice depPrice = priceMap.get(retPrice.getPassengerType());
-                    depPrice.setTaxFeeAmount(depPrice.getTaxFeeAmount().add(retPrice.getTaxFeeAmount()));
-                    depPrice.setPrice(depPrice.getPrice().add(retPrice.getPrice()));
-                    depPrice.setPublishPrice(depPrice.getPublishPrice().add(retPrice.getPublishPrice()));
+                    combinePrice.setTaxFeeAmount(depPrice.getTaxFeeAmount().add(retPrice.getTaxFeeAmount()));
+                    combinePrice.setPrice(depPrice.getPrice().add(retPrice.getPrice()));
+                    combinePrice.setPublishPrice(depPrice.getPublishPrice().add(retPrice.getPublishPrice()));
+                    combinePrice.setPassengerType(depPrice.getPassengerType());
+                    combineCtTu.getPriceList().add(combinePrice);
                 }
+
+                combineCtTu.setRefundInfoList(Lists.newArrayList());
+                combineCtTu.setChangesInfoList(Lists.newArrayList());
+
+                CtShoppingResult ctShoppingResult = new CtShoppingResult();
+                ctShoppingResult.setFlightRefList(Lists.newArrayList());
+                ctShoppingResult.getFlightRefList().addAll(depResult.getFlightRefList());
+                ctShoppingResult.getFlightRefList().addAll(retResult.getFlightRefList());
+                ctShoppingResult.setData(depResult.getData()+"|"+retResult.getData());
+                ctShoppingResult.setTuList(Lists.newArrayList(combineCtTu));
+                combineResult.getShoppingResultList().add(ctShoppingResult);
+
             }
         }
-        return dep;
+        combineResult.setFlightList(Lists.newArrayList());
+        combineResult.getFlightList().addAll(dep.getFlightList());
+        combineResult.getFlightList().addAll(ret.getFlightList());
+        return combineResult;
     }
 
 }
