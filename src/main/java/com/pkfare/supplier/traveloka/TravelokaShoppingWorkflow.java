@@ -191,6 +191,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRefs.add(ctFlightRef);
                 farebasisList.add(segment.getString("fareBasisCode"));
             }
+            ctTu.setValidatingCarrier(depSegments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
         }
         return ctSearchResult;
@@ -284,6 +285,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
                 farebasisList.add(segment.getString("fareBasisCode"));
             }
+            ctTu.setValidatingCarrier(segments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
         }
         return ctSearchResult;
@@ -318,17 +320,24 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         CtSearchSegment ctSearchSegment = new CtSearchSegment();
         JSONObject departureDetail = segment.getJSONObject("departureDetail");
         ctSearchSegment.setDepAirport(departureDetail.getString("airportCode"));
-        ctSearchSegment.setDepTerminal(departureDetail.getString("departureTerminal"));
+        if (StringUtils.length(departureDetail.getString("departureTerminal")) < 2){
+            ctSearchSegment.setDepTerminal(departureDetail.getString("departureTerminal"));
+        }
         String depTime = departureDetail.getString("departureDate") + departureDetail.getString("departureTime");
         ctSearchSegment.setDepTime(Times.of(depTime, "MM-dd-yyyyHH:mm").to("yyyyMMddHHmm"));
         JSONObject arrivalDetail = segment.getJSONObject("arrivalDetail");
         String arrTime = arrivalDetail.getString("arrivalDate") + arrivalDetail.getString("arrivalTime");
         ctSearchSegment.setArrTime(Times.of(arrTime, "MM-dd-yyyyHH:mm").to("yyyyMMddHHmm"));
         ctSearchSegment.setArrAirport(arrivalDetail.getString("airportCode"));
-        ctSearchSegment.setArrTerminal(arrivalDetail.getString("arrivalTerminal"));
-        ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-", ""));
+        if (StringUtils.length(arrivalDetail.getString("arrivalTerminal")) < 2){
+            ctSearchSegment.setDepTerminal(arrivalDetail.getString("arrivalTerminal"));
+        }
+        ctSearchSegment.setFlightNumber(segment.getString("flightCode").substring(3));
         ctSearchSegment.setMarketingCarrier(segment.getString("marketingAirline"));
         ctSearchSegment.setOperatingCarrier(segment.getString("operatingAirline"));
+        if (Objects.isNull(ctSearchSegment.getOperatingCarrier())){
+            ctSearchSegment.setOperatingCarrier(segment.getString("brandAirline"));
+        }
         if (segment.getJSONObject("stopInfo") != null) {
             CtStop ctStop = new CtStop();
             ctStop.setStopAirport(segment.getJSONObject("stopInfo").getString("airportCode"));
@@ -489,10 +498,13 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                     combinePrice.setPassengerType(depPrice.getPassengerType());
                     combineCtTu.getPriceList().add(combinePrice);
                 }
-
+                combineCtTu.setValidatingCarrier(depCtTu.getValidatingCarrier());
                 combineCtTu.setRefundInfoList(Lists.newArrayList());
                 combineCtTu.setChangesInfoList(Lists.newArrayList());
-
+                combineCtTu.setFormatBaggageDetailList(Lists.newArrayList());
+                combineCtTu.getFormatBaggageDetailList().addAll(depCtTu.getFormatBaggageDetailList());
+                combineCtTu.getFormatBaggageDetailList().addAll(retCtTu.getFormatBaggageDetailList());
+                combineCtTu.setCurrency(depCtTu.getCurrency());
                 CtShoppingResult ctShoppingResult = new CtShoppingResult();
                 ctShoppingResult.setFlightRefList(Lists.newArrayList());
                 ctShoppingResult.getFlightRefList().addAll(depResult.getFlightRefList());
