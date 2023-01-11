@@ -21,8 +21,6 @@ import com.pkfare.supplier.traveloka.entity.req.shopping.FlightSearchRQ;
 import com.pkfare.supplier.traveloka.entity.req.shopping.JourneyReq;
 import com.pkfare.supplier.traveloka.entity.req.shopping.PackageRoundTripFlightSearchRQ;
 import com.pkfare.supplier.traveloka.entity.req.shopping.PassengerReq;
-import com.pkfare.supplier.validation.InvalidInputException;
-import com.pkfare.supplier.validation.InvalidOutputException;
 import io.reactivex.Single;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -57,16 +55,6 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     Locations locations;
 
     @Override
-    public void validateInput(CtSearchParam ctSearchParam, Context context) throws InvalidInputException {
-
-    }
-
-    @Override
-    public void validateOutput(CtSearchResult ctSearchResult, Context context) throws InvalidOutputException {
-
-    }
-
-    @Override
     public Single<CtSearchResult> execute(CtSearchParam ctSearchParam, Context context) {
         SupplierInterfaceConfig onewayConfigure = context.getConfigure("oneWay");
         SupplierInterfaceConfig roundTripConfigure = context.getConfigure("roundTrip");
@@ -82,7 +70,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         switch (ctSearchParam.getTripType()) {
             case TripType.ONE_WAY:
                 single = httpSend.url(onewayConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq))
-                        .map(receive -> completable(receive.getReceivePayload(), TripType.DEPARTURE))
+                        .map(receive -> completable(receive.getReceivePayload(), TripType.DEPARTURE,passengerCount))
                         .retryWhen(new Retries(10, 2000));
                 break;
             case TripType.ROUND_TRIP:
@@ -313,6 +301,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 }
                 break;
         }
+        ctFormatBaggageDetail.setPassengerType(0);
         return Optional.of(ctFormatBaggageDetail);
     }
 
