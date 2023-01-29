@@ -22,7 +22,9 @@ import com.pkfare.supplier.traveloka.entity.req.shopping.JourneyReq;
 import com.pkfare.supplier.traveloka.entity.req.shopping.PackageRoundTripFlightSearchRQ;
 import com.pkfare.supplier.traveloka.entity.req.shopping.PassengerReq;
 import io.reactivex.Single;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 
 import static com.pkfare.supplier.traveloka.entity.constant.TravelokaConstant.cabinClassMapping;
 
+@Slf4j
 @Service
 public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
@@ -61,6 +64,9 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         SupplierInterfaceConfig packageRoundTripConfigure = context.getConfigure("packageRoundTrip");
         Single<CtSearchResult> single = Single.never();
         String token = travelokaAuthorization.getToken(context);
+        if (StringUtils.isEmpty(token)){
+            throw new RuntimeException("api auth fail.");
+        }
         HttpSend httpSend = context.buildHttpSend().addHeader("Authorization", token);
 
         httpSend.addHeader("Content-Type", "application/json;");
@@ -96,12 +102,13 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     private CtSearchResult completable(String payload, int passengerCount) {
         JSONObject response = JSON.parseObject(payload);
         Boolean success = response.getBoolean("success");
-        if (!success) {
-            throw new RuntimeException();
+        if (BooleanUtils.isNotTrue(success)) {
+            String err = response.getString("errorMessage");
+            return new CtSearchResult(APICodes.Basic.RES_ERR);
         }
         JSONObject data = response.getJSONObject("data");
         Boolean completed = data.getBoolean("completed");
-        if (!completed) {
+        if (BooleanUtils.isNotTrue(completed)) {
             throw new RetryException("");
         }
         CtSearchResult ctSearchResult = CtSearchResult.success();
@@ -188,7 +195,8 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     private CtSearchResult completable(String payload, int type, int passengerCount) {
         JSONObject response = JSON.parseObject(payload);
         Boolean success = response.getBoolean("success");
-        if (!success) {
+        if (BooleanUtils.isNotTrue(success)) {
+            String err = response.getString("errorMessage");
             return new CtSearchResult(APICodes.Basic.RES_ERR);
         }
         JSONObject data = response.getJSONObject("data");

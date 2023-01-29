@@ -7,11 +7,15 @@ import com.pkfare.supplier.Context;
 import com.pkfare.supplier.bean.configure.SupplierInterfaceConfig;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Date;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
@@ -20,14 +24,6 @@ import java.util.concurrent.TimeUnit;
 @Service
 @Slf4j
 public class TravelokaAuthorization {
-
-    private static final Map<String, String> HEADER = new HashMap<>();
-
-    private static final String CLIENT_ID_NAME = "client_id";
-
-    private static final String CLIENT_SECRET_NAME = "client_secret";
-
-    private static final String ACCESS_TOKEN_NAME = "access_token";
 
     private static final Map<String, FutureTask<Token>> TOKEN_MAP = new ConcurrentHashMap<>();
 
@@ -77,10 +73,10 @@ public class TravelokaAuthorization {
             }
             return token.getAccessToken();
         } catch (ExecutionException e) {
-//            log.error("", e);
+            log.error(ExceptionUtils.getStackTrace(e));
             TOKEN_MAP.remove(authConfig.getUsername());
         } catch (Exception e) {
-//            log.error("", e);
+            log.error(ExceptionUtils.getStackTrace(e));
         }
         return null;
     }
@@ -112,10 +108,13 @@ public class TravelokaAuthorization {
         String payload = "client_id=" + token.getClientId() + "&client_secret=" + token.getClientSecret();
         HttpReceive receive = httpSend.addHeader("Content-Type","application/x-www-form-urlencoded;charset=utf-8").url(token.getUrl()).send(payload);
         String result = receive.getReceivePayload();
+        if (200 != receive.getHttpCode()){
+            throw new RuntimeException("get token failed, status code:" + receive.getHttpCode());
+        }
         JSONObject responseObject = JSONObject.parseObject(result);
         String tokenStr = Optional.ofNullable(responseObject.get("access_token")).map(Object::toString).orElse(null);
         if(StringUtils.isEmpty(tokenStr)){
-            throw new RuntimeException("获取token失败");
+            throw new RuntimeException("get token failed, token is empty.");
         }else {
             return tokenStr;
         }
