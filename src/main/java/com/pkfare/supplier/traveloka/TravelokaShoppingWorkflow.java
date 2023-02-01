@@ -228,7 +228,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
             CtShoppingResult ctShoppingResult = new CtShoppingResult();
             shoppingResultList.add(ctShoppingResult);
-            ctShoppingResult.setData(solution.getString("flightId"));
+//            ctShoppingResult.setData(solution.getString("flightId"));
 
             List<CtFlightRef> ctFlightRefs = Lists.newArrayList();
             ctShoppingResult.setFlightRefList(ctFlightRefs);
@@ -322,14 +322,15 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         }
         String depTime = departureDetail.getString("departureDate") + departureDetail.getString("departureTime");
         ctSearchSegment.setDepTime(Times.of(depTime, "MM-dd-yyyyHH:mm").to("yyyyMMddHHmm"));
+
         JSONObject arrivalDetail = segment.getJSONObject("arrivalDetail");
         String arrTime = arrivalDetail.getString("arrivalDate") + arrivalDetail.getString("arrivalTime");
         ctSearchSegment.setArrTime(Times.of(arrTime, "MM-dd-yyyyHH:mm").to("yyyyMMddHHmm"));
         ctSearchSegment.setArrAirport(arrivalDetail.getString("airportCode"));
         if (StringUtils.length(arrivalDetail.getString("arrivalTerminal")) < 2){
-            ctSearchSegment.setDepTerminal(arrivalDetail.getString("arrivalTerminal"));
+            ctSearchSegment.setArrTerminal(arrivalDetail.getString("arrivalTerminal"));
         }
-        ctSearchSegment.setFlightNumber(segment.getString("flightCode").substring(3));
+        ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-",""));
         ctSearchSegment.setMarketingCarrier(segment.getString("marketingAirline"));
         ctSearchSegment.setOperatingCarrier(segment.getString("operatingAirline"));
         if (Objects.isNull(ctSearchSegment.getOperatingCarrier())){
