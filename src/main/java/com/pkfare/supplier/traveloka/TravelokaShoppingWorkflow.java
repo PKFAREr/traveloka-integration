@@ -21,6 +21,7 @@ import com.pkfare.supplier.traveloka.entity.req.shopping.FlightSearchRQ;
 import com.pkfare.supplier.traveloka.entity.req.shopping.JourneyReq;
 import com.pkfare.supplier.traveloka.entity.req.shopping.PackageRoundTripFlightSearchRQ;
 import com.pkfare.supplier.traveloka.entity.req.shopping.PassengerReq;
+import com.pkfare.supplier.validation.InvalidInputException;
 import io.reactivex.Single;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
@@ -58,6 +59,18 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     Locations locations;
 
     @Override
+    public void validateInput(CtSearchParam ctSearchParam, Context context) throws InvalidInputException {
+        ShoppingWorkflow.super.validateInput(ctSearchParam, context);
+        int total = ctSearchParam.getAdultNumber();
+        if (Objects.nonNull(ctSearchParam.getChildNumber())){
+            total += ctSearchParam.getChildNumber();
+        }
+        if (total > 7){
+            throw new InvalidInputException("traveloka only allow no more than 7 passengers.");
+        }
+    }
+
+    @Override
     public Single<CtSearchResult> execute(CtSearchParam ctSearchParam, Context context) {
         SupplierInterfaceConfig onewayConfigure = context.getConfigure("oneWay");
         SupplierInterfaceConfig roundTripConfigure = context.getConfigure("roundTrip");
@@ -82,10 +95,12 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             case TripType.ROUND_TRIP:
                 if (standardLocations.city2country(ctSearchParam.getFromCity()).equals(standardLocations.city2country(ctSearchParam.getToCity()))) {
                     FlightSearchRQ retReq = buildRequest(ctSearchParam, TripType.RETURN);
+                    HttpSend httpSendReturn = context.buildHttpSend().addHeaders(httpSend.getHeaders());
+
                     single = Single.zip(
                             httpSend.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq)).map(receive -> completable(receive.getReceivePayload(), TripType.DEPARTURE, passengerCount))
                                     .retryWhen(new Retries(10, 2000)),
-                            httpSend.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(retReq)).map(receive -> completable(receive.getReceivePayload(), TripType.RETURN, passengerCount))
+                            httpSendReturn.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(retReq)).map(receive -> completable(receive.getReceivePayload(), TripType.RETURN, passengerCount))
                                     .retryWhen(new Retries(10, 2000)),
                             this::combine);
                 } else {
@@ -128,7 +143,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             CtShoppingResult ctShoppingResult = new CtShoppingResult();
             shoppingResultList.add(ctShoppingResult);
             //flight id
-            ctShoppingResult.setData(entry.getValue());
+//            ctShoppingResult.setData(entry.getValue());
             List<CtFlightRef> ctFlightRefs = Lists.newArrayList();
             ctShoppingResult.setFlightRefList(ctFlightRefs);
             List<CtTu> ctTus = Lists.newArrayList();
@@ -145,9 +160,9 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             JSONArray depSegments = dep.getJSONArray("segments");
             JSONArray retSegments = ret.getJSONArray("segments");
 
-            if (depSegments.size() > 2 || retSegments.size() > 2) {
-                continue;
-            }
+//            if (depSegments.size() > 2 || retSegments.size() > 2) {
+//                continue;
+//            }
 
             List<String> farebasisList = Lists.newArrayList();
 
@@ -166,7 +181,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSeatGrade(cabinClassMapping(segment.getString("seatClass")));
                 ctFlightRef.setSeatCount(passengerCount);
                 ctFlightRefs.add(ctFlightRef);
-                farebasisList.add(segment.getString("fareBasisCode"));
+                farebasisList.add((String) segment.getOrDefault("fareBasisCode","YRT"));
 
             }
 
@@ -184,7 +199,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSeatGrade(cabinClassMapping(segment.getString("seatClass")));
                 ctFlightRef.setSeatCount(passengerCount);
                 ctFlightRefs.add(ctFlightRef);
-                farebasisList.add(segment.getString("fareBasisCode"));
+                farebasisList.add((String) segment.getOrDefault("fareBasisCode","YRT"));
             }
             ctTu.setValidatingCarrier(depSegments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
@@ -222,9 +237,9 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             JSONObject journey = (JSONObject) solution.getJSONArray("journeys").get(0);
             JSONArray segments = journey.getJSONArray("segments");
 
-            if (segments.size() > 2) {
-                continue;
-            }
+//            if (segments.size() > 2) {
+//                continue;
+//            }
 
             CtShoppingResult ctShoppingResult = new CtShoppingResult();
             shoppingResultList.add(ctShoppingResult);
@@ -298,6 +313,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         switch (baggageType){
             case "KG":
                 ctFormatBaggageDetail.setBaggageWeight(Integer.valueOf(baggageOption.getString("baggageWeight")));
+                ctFormatBaggageDetail.setBaggagePiece(-1);
                 if (ctFormatBaggageDetail.getBaggageWeight() == 0){
                     return Optional.empty();
                 }
@@ -333,8 +349,11 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-",""));
         ctSearchSegment.setMarketingCarrier(segment.getString("marketingAirline"));
         ctSearchSegment.setOperatingCarrier(segment.getString("operatingAirline"));
-        if (Objects.isNull(ctSearchSegment.getOperatingCarrier())){
+        if (StringUtils.length(ctSearchSegment.getOperatingCarrier()) != 2){
             ctSearchSegment.setOperatingCarrier(segment.getString("brandAirline"));
+            if (StringUtils.length(ctSearchSegment.getOperatingCarrier()) != 2){
+                ctSearchSegment.setOperatingCarrier(ctSearchSegment.getMarketingCarrier());
+            }
         }
         if (segment.getJSONObject("stopInfo") != null) {
             CtStop ctStop = new CtStop();
