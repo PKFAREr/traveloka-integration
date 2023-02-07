@@ -347,7 +347,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             ctSearchSegment.setArrTerminal(arrivalDetail.getString("arrivalTerminal"));
         }
         ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-",""));
-        ctSearchSegment.setMarketingCarrier(segment.getString("marketingAirline"));
+        ctSearchSegment.setMarketingCarrier(segment.getString("operatingAirline"));
         ctSearchSegment.setOperatingCarrier(segment.getString("operatingAirline"));
         if (StringUtils.length(ctSearchSegment.getOperatingCarrier()) != 2){
             ctSearchSegment.setOperatingCarrier(segment.getString("brandAirline"));
