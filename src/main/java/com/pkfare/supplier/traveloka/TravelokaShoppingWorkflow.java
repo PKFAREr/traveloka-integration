@@ -90,7 +90,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         switch (ctSearchParam.getTripType()) {
             case TripType.ONE_WAY:
                 single = httpSend.url(onewayConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq))
-                        .map(receive -> completable(receive, TripType.DEPARTURE,passengerCount))
+                        .map(receive -> completable(receive, TripType.DEPARTURE, ctSearchParam))
                         .retryWhen(new Retries(10, 2000));
                 break;
             case TripType.ROUND_TRIP:
@@ -99,14 +99,14 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                     HttpSend httpSendReturn = context.buildHttpSend().addHeaders(httpSend.getHeaders());
 
                     single = Single.zip(
-                            httpSend.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq)).map(receive -> completable(receive, TripType.DEPARTURE, passengerCount))
+                            httpSend.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq)).map(receive -> completable(receive, TripType.DEPARTURE, ctSearchParam))
                                     .retryWhen(new Retries(10, 2000)),
-                            httpSendReturn.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(retReq)).map(receive -> completable(receive, TripType.RETURN, passengerCount))
+                            httpSendReturn.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(retReq)).map(receive -> completable(receive, TripType.RETURN, ctSearchParam))
                                     .retryWhen(new Retries(10, 2000)),
                             this::combine);
                 } else {
                     PackageRoundTripFlightSearchRQ req = buildRequest(ctSearchParam);
-                    single = httpSend.url(packageRoundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(req)).map(receive -> completable(receive, passengerCount))
+                    single = httpSend.url(packageRoundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(req)).map(receive -> completable(receive, ctSearchParam))
                             .retryWhen(new Retries(10, 2000));
                 }
                 break;
@@ -118,7 +118,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     /***
      * parse intl RT result
      */
-    private CtSearchResult completable(HttpReceive receive, int passengerCount) {
+    private CtSearchResult completable(HttpReceive receive, CtSearchParam ctSearchParam) {
         if (!receive.isOk()){
             return new CtSearchResult(APICodes.Basic.NET_ERR);
         }
@@ -142,6 +142,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         ctSearchResult.setFlightList(flightList);
         ctSearchResult.setShoppingResultList(shoppingResultList);
 
+        int passengerCount = ctSearchParam.getAdultNumber() + ctSearchParam.getChildNumber();
         JSONArray departureFlightDetail = data.getJSONArray("departureFlightDetail");
         JSONArray returnFlightDetail = data.getJSONArray("returnFlightDetail");
         Map<String, String> flightIdTable = data.getObject("flightIdTable", Map.class);
@@ -252,7 +253,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     /**
      * parse OW or one side flights of domestic RT
      * */
-    private CtSearchResult completable(HttpReceive receive, int type, int passengerCount) {
+    private CtSearchResult completable(HttpReceive receive, int type, CtSearchParam ctSearchParam) {
         if (!receive.isOk()){
             return new CtSearchResult(APICodes.Basic.NET_ERR);
         }
@@ -267,7 +268,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         }
         JSONObject data = response.getJSONObject("data");
         Boolean completed = data.getBoolean("completed");
-        if (!completed) {
+        if (BooleanUtils.isNotTrue(completed)) {
             throw new RetryException("");
         }
         CtSearchResult ctSearchResult = CtSearchResult.success();
@@ -276,6 +277,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         ctSearchResult.setFlightList(flightList);
         ctSearchResult.setShoppingResultList(shoppingResultList);
 
+        int passengerCount = ctSearchParam.getAdultNumber() + ctSearchParam.getChildNumber();
         JSONArray array = data.getJSONArray("oneWayFlightSearchResults");
         if (Objects.isNull(array)) {
             array = data.getJSONArray("basicRoundTripFlightSearchResults");
@@ -345,7 +347,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                     }
                 }
 
-                farebasisList.add(segment.getString("fareBasisCode"));
+                farebasisList.add((String) segment.getOrDefault("fareBasisCode","2".equals(ctSearchParam.getTripType())?"YRT":"YOW"));
             }
             ctTu.setValidatingCarrier(segments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
