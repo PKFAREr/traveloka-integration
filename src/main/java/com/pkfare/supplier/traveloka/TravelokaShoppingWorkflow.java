@@ -89,9 +89,8 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
         switch (ctSearchParam.getTripType()) {
             case TripType.ONE_WAY:
-                single = httpSend.url(onewayConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq))
-                        .map(receive -> completable(receive, TripType.DEPARTURE, ctSearchParam))
-                        .retryWhen(new Retries(10, 2000));
+                single = Single.defer(()->httpSend.url(onewayConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq))
+                        .map(receive -> completable(receive, TripType.DEPARTURE, ctSearchParam))).retryWhen(new Retries(10, 2000));
                 break;
             case TripType.ROUND_TRIP:
                 if (standardLocations.city2country(ctSearchParam.getFromCity()).equals(standardLocations.city2country(ctSearchParam.getToCity()))) {
@@ -99,14 +98,16 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                     HttpSend httpSendReturn = context.buildHttpSend().addHeaders(httpSend.getHeaders());
 
                     single = Single.zip(
-                            httpSend.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq)).map(receive -> completable(receive, TripType.DEPARTURE, ctSearchParam))
+                            Single.defer(()->
+                            httpSend.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(depReq)).map(receive -> completable(receive, TripType.DEPARTURE, ctSearchParam)))
                                     .retryWhen(new Retries(10, 2000)),
-                            httpSendReturn.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(retReq)).map(receive -> completable(receive, TripType.RETURN, ctSearchParam))
+                            Single.defer(()->
+                            httpSendReturn.url(roundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(retReq)).map(receive -> completable(receive, TripType.RETURN, ctSearchParam)))
                                     .retryWhen(new Retries(10, 2000)),
                             this::combine);
                 } else {
                     PackageRoundTripFlightSearchRQ req = buildRequest(ctSearchParam);
-                    single = httpSend.url(packageRoundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(req)).map(receive -> completable(receive, ctSearchParam))
+                    single = Single.defer(()->httpSend.url(packageRoundTripConfigure.getUrl()).asyncSend(JSON.toJSONString(req)).map(receive -> completable(receive, ctSearchParam)))
                             .retryWhen(new Retries(10, 2000));
                 }
                 break;
@@ -134,7 +135,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         JSONObject data = response.getJSONObject("data");
         Boolean completed = data.getBoolean("completed");
         if (BooleanUtils.isNotTrue(completed)) {
-            throw new RetryException("");
+            throw new RetryException("Reach to max retry times, please check network and try again later.");
         }
         CtSearchResult ctSearchResult = CtSearchResult.success();
         List<CtShoppingResult> shoppingResultList = Lists.newArrayList();
