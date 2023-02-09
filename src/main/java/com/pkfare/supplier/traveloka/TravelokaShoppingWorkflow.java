@@ -130,7 +130,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         Boolean success = response.getBoolean("success");
         if (BooleanUtils.isNotTrue(success)) {
             String err = response.getString("errorMessage");
-            return new CtSearchResult(APICodes.Basic.RES_ERR);
+            return new CtSearchResult(APICodes.Basic.SYSTEM_ERR, err);
         }
         JSONObject data = response.getJSONObject("data");
         Boolean completed = data.getBoolean("completed");
@@ -265,12 +265,12 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         Boolean success = response.getBoolean("success");
         if (BooleanUtils.isNotTrue(success)) {
             String err = response.getString("errorMessage");
-            return new CtSearchResult(APICodes.Basic.RES_ERR);
+            return new CtSearchResult(APICodes.Basic.SYSTEM_ERR, err);
         }
         JSONObject data = response.getJSONObject("data");
         Boolean completed = data.getBoolean("completed");
         if (BooleanUtils.isNotTrue(completed)) {
-            throw new RetryException("");
+            throw new RetryException("Reach to max retry times, please check network and try again later.");
         }
         CtSearchResult ctSearchResult = CtSearchResult.success();
         List<CtShoppingResult> shoppingResultList = Lists.newArrayList();
