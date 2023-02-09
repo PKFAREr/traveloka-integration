@@ -194,7 +194,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSeatClass(segment.getString("subClass"));
                 ctFlightRef.setSeatCount(passengerCount);
                 ctFlightRefs.add(ctFlightRef);
-                farebasisList.add((String) segment.getOrDefault("fareBasisCode","YRT"));
+                farebasisList.add(StringUtils.defaultIfEmpty(segment.getString("fareBasisCode"),"YRT"));
 
                 JSONArray baggageOptions = segment.getJSONObject("addOns").getJSONArray("baggageOptions");
                 if (Objects.nonNull(baggageOptions)){
@@ -227,7 +227,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 ctFlightRef.setSeatClass(segment.getString("subClass"));
                 ctFlightRef.setSeatCount(passengerCount);
                 ctFlightRefs.add(ctFlightRef);
-                farebasisList.add((String) segment.getOrDefault("fareBasisCode","YRT"));
+                farebasisList.add(StringUtils.defaultIfEmpty(segment.getString("fareBasisCode"),"YRT"));
 
                 JSONArray baggageOptions = segment.getJSONObject("addOns").getJSONArray("baggageOptions");
                 if (Objects.nonNull(baggageOptions)){
@@ -347,7 +347,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                     }
                 }
 
-                farebasisList.add((String) segment.getOrDefault("fareBasisCode","2".equals(ctSearchParam.getTripType())?"YRT":"YOW"));
+                farebasisList.add(StringUtils.defaultIfEmpty(segment.getString("fareBasisCode"),"2".equals(ctSearchParam.getTripType())?"YRT":"YOW"));
             }
             ctTu.setValidatingCarrier(segments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
@@ -400,14 +400,8 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             ctSearchSegment.setArrTerminal(arrivalDetail.getString("arrivalTerminal"));
         }
         ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-",""));
-        ctSearchSegment.setMarketingCarrier(segment.getString("operatingAirline"));
+        ctSearchSegment.setMarketingCarrier(ctSearchSegment.getFlightNumber().substring(0,2));
         ctSearchSegment.setOperatingCarrier(segment.getString("operatingAirline"));
-        if (StringUtils.length(ctSearchSegment.getOperatingCarrier()) != 2){
-            ctSearchSegment.setOperatingCarrier(segment.getString("brandAirline"));
-            if (StringUtils.length(ctSearchSegment.getOperatingCarrier()) != 2){
-                ctSearchSegment.setOperatingCarrier(ctSearchSegment.getMarketingCarrier());
-            }
-        }
         if (segment.getJSONObject("stopInfo") != null) {
             CtStop ctStop = new CtStop();
             ctStop.setStopAirport(segment.getJSONObject("stopInfo").getString("airportCode"));
