@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cglib.beans.BeanCopier;
 import org.springframework.retry.RetryException;
 import org.springframework.stereotype.Service;
 
@@ -58,6 +59,10 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     @Autowired
     @Qualifier("traveloka-location-mapping")
     Locations locations;
+
+    private final BeanCopier baggageCopier = BeanCopier
+            .create(CtFormatBaggageDetail.class, CtFormatBaggageDetail.class, false);
+
 
     @Override
     public void validateInput(CtSearchParam ctSearchParam, Context context) throws InvalidInputException {
@@ -208,7 +213,14 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                         CtFormatBaggageDetail ctFormatBaggageDetail = ctFormatBaggageDetailOptional.get();
                         ctFormatBaggageDetail.setFlightSeq(ctFlightRef.getFlightSeq());
                         ctFormatBaggageDetail.setSegmentNo(1);
+                        ctFormatBaggageDetail.setPassengerType(0);
                         baggageDetails.add(ctFormatBaggageDetail);
+                        if (ctSearchParam.getChildNumber() > 0){
+                            CtFormatBaggageDetail chdFormatBaggageDetail = new CtFormatBaggageDetail();
+                            baggageCopier.copy(ctFormatBaggageDetail,chdFormatBaggageDetail,null);
+                            chdFormatBaggageDetail.setPassengerType(1);
+                            baggageDetails.add(chdFormatBaggageDetail);
+                        }
                     }
                 }
             }
@@ -241,7 +253,14 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                         CtFormatBaggageDetail ctFormatBaggageDetail = ctFormatBaggageDetailOptional.get();
                         ctFormatBaggageDetail.setFlightSeq(ctFlightRef.getFlightSeq());
                         ctFormatBaggageDetail.setSegmentNo(2);
+                        ctFormatBaggageDetail.setPassengerType(0);
                         baggageDetails.add(ctFormatBaggageDetail);
+                        if (ctSearchParam.getChildNumber() > 0){
+                            CtFormatBaggageDetail chdFormatBaggageDetail = new CtFormatBaggageDetail();
+                            baggageCopier.copy(ctFormatBaggageDetail,chdFormatBaggageDetail,null);
+                            chdFormatBaggageDetail.setPassengerType(1);
+                            baggageDetails.add(chdFormatBaggageDetail);
+                        }
                     }
                 }
             }
@@ -345,6 +364,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                         ctFormatBaggageDetail.setFlightSeq(ctFlightRef.getFlightSeq());
                         ctFormatBaggageDetail.setSegmentNo(type);
                         baggageDetails.add(ctFormatBaggageDetail);
+                        //
                     }
                 }
 
@@ -402,7 +422,10 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         }
         ctSearchSegment.setFlightNumber(segment.getString("flightCode").replace("-",""));
         ctSearchSegment.setMarketingCarrier(ctSearchSegment.getFlightNumber().substring(0,2));
-        ctSearchSegment.setOperatingCarrier(segment.getString("operatingAirline"));
+        String opAirline = segment.getString("operatingAirline");
+        if (StringUtils.length(opAirline) == 2){
+            ctSearchSegment.setOperatingCarrier(opAirline);
+        }
         if (segment.getJSONObject("stopInfo") != null) {
             CtStop ctStop = new CtStop();
             ctStop.setStopAirport(segment.getJSONObject("stopInfo").getString("airportCode"));
@@ -583,12 +606,22 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
                 ctShoppingResult.getFlightRefList().stream().map(CtFlightRef::getFlightRefNum).map(tempMap::get).forEach(segmentSet::add);
 
-                if (combineResult.getShoppingResultList().size() >= travelokaRtLimit){
-                    combineResult.setFlightList(Lists.newArrayList(segmentSet));
-                    return combineResult;
-                }
+//                if (combineResult.getShoppingResultList().size() >= travelokaRtLimit){
+//                    combineResult.setFlightList(Lists.newArrayList(segmentSet));
+//                    return combineResult;
+//                }
             }
         }
+        combineResult.getShoppingResultList().sort((r1, r2) -> {
+            Optional<CtPrice> adtPrice1 = r1.getTuList().get(0).getPriceList().stream().filter(price -> price.getPassengerType() == 0).findAny();
+            Optional<CtPrice> adtPrice2 = r2.getTuList().get(0).getPriceList().stream().filter(price -> price.getPassengerType() == 0).findAny();
+            if (!adtPrice1.isPresent() || !adtPrice2.isPresent()) {
+                return 0;
+            }
+            return adtPrice1.get().getPrice().compareTo(adtPrice2.get().getPrice());
+        });
+
+        combineResult.setShoppingResultList(combineResult.getShoppingResultList().subList(0, travelokaRtLimit));
         combineResult.setFlightList(Lists.newArrayList(segmentSet));
         return combineResult;
     }
