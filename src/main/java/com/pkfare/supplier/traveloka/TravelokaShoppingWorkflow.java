@@ -229,7 +229,6 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                         CtFormatBaggageDetail ctFormatBaggageDetail = ctFormatBaggageDetailOptional.get();
                         ctFormatBaggageDetail.setFlightSeq(ctFlightRef.getFlightSeq());
                         ctFormatBaggageDetail.setSegmentNo(1);
-                        ctFormatBaggageDetail.setPassengerType(0);
                         baggageDetails.add(ctFormatBaggageDetail);
                         if (ctSearchParam.getChildNumber() > 0){
                             CtFormatBaggageDetail chdFormatBaggageDetail = new CtFormatBaggageDetail();
@@ -269,7 +268,6 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                         CtFormatBaggageDetail ctFormatBaggageDetail = ctFormatBaggageDetailOptional.get();
                         ctFormatBaggageDetail.setFlightSeq(ctFlightRef.getFlightSeq());
                         ctFormatBaggageDetail.setSegmentNo(2);
-                        ctFormatBaggageDetail.setPassengerType(0);
                         baggageDetails.add(ctFormatBaggageDetail);
                         if (ctSearchParam.getChildNumber() > 0){
                             CtFormatBaggageDetail chdFormatBaggageDetail = new CtFormatBaggageDetail();
@@ -381,6 +379,12 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                         ctFormatBaggageDetail.setFlightSeq(ctFlightRef.getFlightSeq());
                         ctFormatBaggageDetail.setSegmentNo(type);
                         baggageDetails.add(ctFormatBaggageDetail);
+                        if (ctSearchParam.getChildNumber() > 0){
+                            CtFormatBaggageDetail chdFormatBaggageDetail = new CtFormatBaggageDetail();
+                            baggageCopier.copy(ctFormatBaggageDetail,chdFormatBaggageDetail,null);
+                            chdFormatBaggageDetail.setPassengerType(1);
+                            baggageDetails.add(chdFormatBaggageDetail);
+                        }
                         //
                     }
                 }
