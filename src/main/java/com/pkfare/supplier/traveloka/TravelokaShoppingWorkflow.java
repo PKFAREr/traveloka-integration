@@ -104,7 +104,6 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
         httpSend.addHeader("Content-Type", "application/json;");
         FlightSearchRQ depReq = buildRequest(ctSearchParam, TripType.DEPARTURE);
-        int passengerCount = ctSearchParam.getAdultNumber() + ctSearchParam.getChildNumber();
 
         switch (ctSearchParam.getTripType()) {
             case TripType.ONE_WAY:
@@ -198,14 +197,17 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
             List<String> farebasisList = Lists.newArrayList();
 
-            //航程级别索引，往返各从头开始计数
+            //flight index, count individually by each flight
             int segmentIndex = 0;
             for (Object o1 : depSegments) {
                 JSONObject segment = (JSONObject) o1;
                 CtSearchSegment ctSearchSegment = parseSegment(segment);
                 ctSearchSegment.setFlightRefNum(index++);
                 flightList.add(ctSearchSegment);
-
+                if(segmentIndex == 0){
+                    //set first departure segment airline as ValidatingCarrier
+                    ctTu.setValidatingCarrier(ctSearchSegment.getMarketingCarrier());
+                }
                 CtFlightRef ctFlightRef = new CtFlightRef();
                 ctFlightRef.setFlightRefNum(ctSearchSegment.getFlightRefNum());
                 ctFlightRef.setSegmentNo(TripType.DEPARTURE);
@@ -278,7 +280,6 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                     }
                 }
             }
-            ctTu.setValidatingCarrier(depSegments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
         }
         return ctSearchResult;
@@ -355,7 +356,9 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 CtSearchSegment ctSearchSegment = parseSegment(segment);
                 ctSearchSegment.setFlightRefNum(index++);
                 flightList.add(ctSearchSegment);
-
+                if (segmentIndex == 0){
+                    ctTu.setValidatingCarrier(ctSearchSegment.getMarketingCarrier());
+                }
 
                 CtFlightRef ctFlightRef = new CtFlightRef();
                 ctFlightRef.setFlightRefNum(ctSearchSegment.getFlightRefNum());
@@ -384,7 +387,6 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 
                 farebasisList.add(StringUtils.defaultIfEmpty(segment.getString("fareBasisCode"),"2".equals(ctSearchParam.getTripType())?"YRT":"YOW"));
             }
-            ctTu.setValidatingCarrier(segments.getJSONObject(0).getString("marketingAirline"));
             ctTu.setFareBasis(StringUtils.join(farebasisList, ";"));
         }
         return ctSearchResult;
