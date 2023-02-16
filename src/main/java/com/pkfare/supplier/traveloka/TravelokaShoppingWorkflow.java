@@ -1,5 +1,7 @@
 package com.pkfare.supplier.traveloka;
 
+import static com.pkfare.supplier.traveloka.entity.constant.TravelokaConstant.cabinClassMapping;
+
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -11,8 +13,19 @@ import com.pkfare.common.HttpSend;
 import com.pkfare.supplier.Context;
 import com.pkfare.supplier.ShoppingWorkflow;
 import com.pkfare.supplier.bean.configure.SupplierInterfaceConfig;
-import com.pkfare.supplier.logics.*;
-import com.pkfare.supplier.standard.bean.*;
+import com.pkfare.supplier.logics.Dates;
+import com.pkfare.supplier.logics.Locations;
+import com.pkfare.supplier.logics.Retries;
+import com.pkfare.supplier.logics.StandardLocations;
+import com.pkfare.supplier.logics.Times;
+import com.pkfare.supplier.standard.bean.CtFlightRef;
+import com.pkfare.supplier.standard.bean.CtFormatBaggageDetail;
+import com.pkfare.supplier.standard.bean.CtPassengeType;
+import com.pkfare.supplier.standard.bean.CtPrice;
+import com.pkfare.supplier.standard.bean.CtSearchSegment;
+import com.pkfare.supplier.standard.bean.CtStop;
+import com.pkfare.supplier.standard.bean.CtTu;
+import com.pkfare.supplier.standard.bean.TripType;
 import com.pkfare.supplier.standard.bean.base.APICodes;
 import com.pkfare.supplier.standard.bean.req.CtSearchParam;
 import com.pkfare.supplier.standard.bean.res.CtSearchResult;
@@ -24,6 +37,14 @@ import com.pkfare.supplier.traveloka.entity.req.shopping.PackageRoundTripFlightS
 import com.pkfare.supplier.traveloka.entity.req.shopping.PassengerReq;
 import com.pkfare.supplier.validation.InvalidInputException;
 import io.reactivex.Single;
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -34,13 +55,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cglib.beans.BeanCopier;
 import org.springframework.retry.RetryException;
 import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
-import java.time.Duration;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.pkfare.supplier.traveloka.entity.constant.TravelokaConstant.cabinClassMapping;
 
 @Slf4j
 @Service
@@ -612,6 +626,8 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
 //                }
             }
         }
+
+        //sort by price
         combineResult.getShoppingResultList().sort((r1, r2) -> {
             Optional<CtPrice> adtPrice1 = r1.getTuList().get(0).getPriceList().stream().filter(price -> price.getPassengerType() == 0).findAny();
             Optional<CtPrice> adtPrice2 = r2.getTuList().get(0).getPriceList().stream().filter(price -> price.getPassengerType() == 0).findAny();
@@ -621,6 +637,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
             return adtPrice1.get().getPrice().compareTo(adtPrice2.get().getPrice());
         });
 
+        //limit truncation after price sort
         combineResult.setShoppingResultList(combineResult.getShoppingResultList().subList(0, travelokaRtLimit));
         combineResult.setFlightList(Lists.newArrayList(segmentSet));
         return combineResult;
