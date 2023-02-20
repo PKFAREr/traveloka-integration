@@ -6,7 +6,7 @@
 
     <groupId>com.pkfare.supplier</groupId>
     <artifactId>traveloka-integration</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.1-RELEASE</version>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -19,7 +19,7 @@
             <dependency>
                 <groupId>com.pkfare.supplier</groupId>
                 <artifactId>supplier-gateway-framework</artifactId>
-                <version>1.0.15-SNAPSHOT</version>
+                <version>1.0.15-RELEASE</version>
                 <scope>provided</scope>
             </dependency>
         </dependencies>
