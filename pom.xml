@@ -19,7 +19,7 @@
             <dependency>
                 <groupId>com.pkfare.supplier</groupId>
                 <artifactId>supplier-gateway-framework</artifactId>
-                <version>1.0.15-RELEASE</version>
+                <version>1.0.16-RELEASE</version>
                 <scope>provided</scope>
             </dependency>
         </dependencies>

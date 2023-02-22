@@ -98,7 +98,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         Single<CtSearchResult> single = Single.never();
         String token = travelokaAuthorization.getToken(context);
         if (StringUtils.isEmpty(token)){
-            throw new RuntimeException("api auth fail.");
+            throw new RuntimeException("api auth fail. can not get a token for request.");
         }
         HttpSend httpSend = context.buildHttpSend().addHeader("Authorization", token);
 
@@ -644,7 +644,10 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
         });
 
         //limit truncation after price sort
-        combineResult.setShoppingResultList(combineResult.getShoppingResultList().subList(0, travelokaRtLimit));
+        int size = combineResult.getShoppingResultList().size();
+        if (size > travelokaRtLimit){
+            combineResult.setShoppingResultList(combineResult.getShoppingResultList().subList(0, travelokaRtLimit));
+        }
         combineResult.setFlightList(Lists.newArrayList(segmentSet));
         return combineResult;
     }
