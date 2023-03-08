@@ -546,7 +546,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
      * domestic RT, request dep/ret individually then combine them
      */
     private CtSearchResult combine(CtSearchResult dep, CtSearchResult ret) {
-        if (CollectionUtils.isEmpty(dep.getShoppingResultList()) || CollectionUtils.isEmpty(dep.getShoppingResultList())){
+        if (CollectionUtils.isEmpty(dep.getShoppingResultList()) || CollectionUtils.isEmpty(ret.getShoppingResultList())){
             return new CtSearchResult(APICodes.Basic.NO_RESULT);
         }
         Map<String, CtSearchSegment> segmentMap = Maps.newHashMap();
