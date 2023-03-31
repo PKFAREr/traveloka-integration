@@ -91,7 +91,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
     }
 
     @Override
-    public Single<CtSearchResult> execute(CtSearchParam ctSearchParam, Context context) {
+    public CtSearchResult execute(CtSearchParam ctSearchParam, Context context) {
         SupplierInterfaceConfig onewayConfigure = context.getConfigure("oneWay");
         SupplierInterfaceConfig roundTripConfigure = context.getConfigure("roundTrip");
         SupplierInterfaceConfig packageRoundTripConfigure = context.getConfigure("packageRoundTrip");
@@ -131,7 +131,7 @@ public class TravelokaShoppingWorkflow implements ShoppingWorkflow {
                 break;
             default:
         }
-        return single;
+        return single.blockingGet();
     }
 
     /***
